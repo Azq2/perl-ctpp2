@@ -1,0 +1,3 @@
+TYPEMAP
+CTPP2 *             O_OBJECT
+Bytecode *          O_OBJECT
