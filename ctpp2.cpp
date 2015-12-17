@@ -513,7 +513,7 @@ void CTPP2::perl2cdt(SV *var, CDT *cdt) {
 			
 			HV *hash = (HV *) var;
 			HE *entry;
-			int key_len;
+			I32 key_len;
 			
 			while ((entry = hv_iternext(hash)) != NULL) {
 				str_val = hv_iterkey(entry, &key_len);
