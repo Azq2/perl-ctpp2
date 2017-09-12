@@ -413,180 +413,96 @@ SV *CTPP2::cdt2perl(const CDT *cdt) {
 	return ret;
 }
 
-void CTPP2::perl2cdt(SV *var, CDT *cdt) {
-	if (!var)
+void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
+	if (!sv)
 		return;
 	
-	long type = SvTYPE(var);
-	
-	const char *str_val; STRLEN str_len;
-	switch (type) {
-		case SVt_NULL: // NULL
-			// Nothing todo
-		break;
+	if (SvPOKp(sv)) { // Строка
+		STRLEN len;
+		const char *val = SvPV_const(sv, len);
+		cdt->operator=(STLW::string(val, len));
+	} else if (SvNOKp(sv)) { // Float
+		cdt->operator=(W_FLOAT(SvNV(sv)));
+	} else if (SvIOKp(sv)) { // Int
+		cdt->operator=(INT_64(SvIV(sv)));
+	} else if (SvROK(sv)) { // Ссылка на что-то
+		SV *tmp_sv = SvRV(sv);
 		
-		case SVt_IV: // INT или Reference
-			if (SvIOK(var)) {
-				cdt->operator=(INT_64(SvIV(var)));
-			} else if (SvROK(var)) {
-				return perl2cdt(SvRV(var), cdt);
-			}
-		break;
-		
-		case SVt_NV: // FLOAT
-			cdt->operator=(W_FLOAT(SvNV(var)));
-		break;
-#if (PERL_API_VERSION <= 10)
-		case SVt_RV: // Reference
-			return perl2cdt(SvRV(var), cdt);
-		break;
-#endif
-		case SVt_PV: // String или Reference
-			if (SvPOK(var)) {
-				str_val = SvPV_const(var, str_len);
-				cdt->operator=(STLW::string(str_val, str_len));
-			} else if (SvROK(var)) {
-				return perl2cdt(SvRV(var), cdt);
-			}
-		break;
-		
-		// Хрень какая-то
-		case SVt_PVIV: // Указатель на INT
-		case SVt_PVNV: // Указатель на FLOAT
-		case SVt_PVMG: // Blessed скаляр
-			if (SvIOK(var)) { // INT
-				cdt->operator=(INT_64(SvIV(var)));
-			} else if (SvNOK(var)) { // FLOAT
-				cdt->operator=(W_FLOAT(SvNV(var)));
-			} else if (SvPOK(var)) { // String
-				str_val = SvPV_const(var, str_len);
-				cdt->operator=(STLW::string(str_val, str_len));
-			} else if (SvROK(var)) { // Reference
-				return perl2cdt(SvRV(var), cdt);
-			} else if (!SvOK(var)) { // Undef
-				cdt->operator=(CTPP::CDT());
-			} else if (SvSTASH(var)) { // Stash
-				return perl2cdt((SV *)SvSTASH(var), cdt);
-			}
-#ifdef SvOURSTASH // Perl 5.8.9+
-			else if (SvPAD_OUR(var)) {
-				return perl2cdt((SV *)SvOURSTASH(var), cdt);
-			}
-#endif
-			else { // Unknown
-				cdt->operator=(STLW::string("SVt_PVMG: "));
-				cdt->operator+=(UINT_32(SvFLAGS(var)));
-			}
-		break;
-		
-#if ((PERL_API_VERSION == 8) || (PERL_API_VERSION == 6))
-		case SVt_PVBM: // Что-то из разряда Blessed
-			cdt->operator=(STLW::string("*PVBM*", 6));
-		break;
-#endif
-		
-		case SVt_PVLV: // Left value expr
-			cdt->operator=(STLW::string("*PVLV*", 6));
-		break;
-		
-		case SVt_PVAV: // Array
-		{
-			AV *array = (AV *) var;
-			int array_size = av_len(array) + 1;
+		if (SvOBJECT(tmp_sv)) { // Объект
+			HV *stash = SvSTASH(tmp_sv);
 			
-			if (cdt->GetType() != CTPP::CDT::ARRAY_VAL)
-				cdt->operator=(CTPP::CDT(CTPP::CDT::ARRAY_VAL));
-			for (int i = 0; i <= array_size; ++i) {
-				SV **el = av_fetch(array, i, FALSE);
-				CTPP::CDT tmp;
-				if (el)
-					perl2cdt(*el, &tmp);
-				cdt->operator[](i) = tmp;
-			}
-		}
-		break;
-		
-		case SVt_PVHV: // Hash
-		{
-			if (cdt->GetType() != CTPP::CDT::HASH_VAL)
-				cdt->operator=(CTPP::CDT(CTPP::CDT::HASH_VAL));
-			
-			HV *hash = (HV *) var;
-			HE *entry;
-			I32 key_len;
-			
-			while ((entry = hv_iternext(hash)) != NULL) {
-				str_val = hv_iterkey(entry, &key_len);
-				SV *value = hv_iterval(hash, entry);
-				if (value) {
-					CTPP::CDT tmp;
-					perl2cdt(value, &tmp);
-					cdt->operator[](STLW::string(str_val, key_len)) = tmp;
-				}
-			}
-		}
-		break;
-		
-		case SVt_PVCV: // Subroutine
-		{
-			CV *sub = (CV *) var;
-			dSP;
-			ENTER; SAVETMPS; PUSHMARK(SP);
-			PUTBACK;
-			call_sv((SV *) sub, G_SCALAR);
-			SPAGAIN;
-			
-			var = POPs;
-			try {
-				perl2cdt(var, cdt);
-			} catch (...) {
-				PUTBACK;
-				FREETMPS; LEAVE;
-				throw;
-			}
-			PUTBACK;
-			FREETMPS; LEAVE;
-		}
-		break;
-		
-		case SVt_PVGV: // Object
-		{
-			GV *to_string = gv_fetchmethod_autoload(SvSTASH(var), "(\"\"", 0);
-			if (!to_string) {
-				cdt->operator=(CTPP::CDT::UNDEF);
-			} else {
+			// Ищем перегруженный метод для стрингификации объекта
+			GV *to_string = gv_fetchmethod_autoload(stash, "\x28\x22\x22", 0);
+			if (to_string) {
 				dSP;
 				ENTER; SAVETMPS; PUSHMARK(SP);
-				XPUSHs(sv_bless(sv_2mortal(newRV_inc(var)), SvSTASH(var)));
+				XPUSHs(sv_bless(sv_2mortal(newRV_inc(tmp_sv)), stash));
 				PUTBACK;
 				call_sv((SV *) GvCV(to_string), G_SCALAR);
 				SPAGAIN;
 				
-				var = POPs;
-				try {
-					perl2cdt(var, cdt);
-				} catch (...) {
-					PUTBACK;
-					FREETMPS; LEAVE;
-					throw;
-				}
+				SV *new_sv = POPs;
+				perl2cdt(new_sv, cdt);
+				
 				PUTBACK;
 				FREETMPS; LEAVE;
+				return;
+			}
+			
+			// Объект не поддаётся стрингификации
+			cdt->operator=(STLW::string("*OBJECT*", 8));
+		} else { // Какой-то скаляр
+			perl2cdt(tmp_sv, cdt);
+		}
+	} else if (SvTYPE(sv) == SVt_PVHV) { // Хэш
+		HE *entry;
+		HV *hash = (HV *) sv;
+		
+		if (cdt->GetType() != CTPP::CDT::HASH_VAL)
+			cdt->operator=(CTPP::CDT(CTPP::CDT::HASH_VAL));
+			
+		// Пройдёмся по всем элементам хэша, конвертируя всё в CDT на своём пути
+		while ((entry = hv_iternext(hash)) != NULL) {
+			SV *value = hv_iterval(hash, entry);
+			int key_len;
+			const char *key_name = hv_iterkey(entry, &key_len);
+			if (value) {
+				CTPP::CDT tmp;
+				perl2cdt(value, &tmp);
+				cdt->operator[](STLW::string(key_name, key_len)) = tmp;
 			}
 		}
-		break;
+	} else if (SvTYPE(sv) == SVt_PVAV) { // Массив
+		AV *array = (AV *) sv;
+		int len = av_len(array) + 1;
 		
-		case SVt_PVFM:
-			cdt->operator=(STLW::string("*PVFM*", 6));
-		break;
+		if (cdt->GetType() != CTPP::CDT::ARRAY_VAL)
+			cdt->operator=(CTPP::CDT(CTPP::CDT::ARRAY_VAL));
 		
-		case SVt_PVIO:
-			cdt->operator=(STLW::string("*PVIO*", 6));
-		break;
+		// Пройдёмся по всем элементам массива, конвертируя всё в CDT на своём пути
+		for (int i = 0; i < len; ++i) {
+			SV **el = av_fetch(array, i, FALSE);
+			CTPP::CDT tmp;
+			if (el && *el)
+				perl2cdt(*el, &tmp);
+			cdt->operator[](i) = tmp;
+		}
+	} else if (SvTYPE(sv) == SVt_PVCV) { // Функция
+		dSP;
+		ENTER; SAVETMPS; PUSHMARK(SP);
+		PUTBACK;
+		call_sv(sv, G_SCALAR);
+		SPAGAIN;
 		
-		default: // Some unknown
-			// Nothing todo
-		break;
+		SV *new_sv = POPs;
+		perl2cdt(new_sv, cdt);
+		
+		PUTBACK;
+		FREETMPS; LEAVE;
+	} else if (SvTYPE(sv) == SVt_NULL) { // undef
+		// Ничего не делаем
+	} else {
+		warn("%s: Unknown type (svtype=%d)", __func__, SvTYPE(sv));
 	}
 }
 

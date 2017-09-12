@@ -146,6 +146,7 @@ class CTPP2 {
 		static void perl2cdt(SV *var, CDT *param);
 		static SV *cdt2perl(const CDT *cdt);
 		static void json2cdt(const char *json, unsigned int length, CDT *cdt);
+		static const char *svTypeName(SV *svt);
 		CTPP2 *reset();
 		Bytecode *parse(SV *text, const char *filename, Bytecode::SourceType type);
 		SV *output(Bytecode *bytecode, SV *src_enc, SV *dst_enc);
