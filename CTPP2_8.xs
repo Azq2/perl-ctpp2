@@ -16,6 +16,7 @@ CODE:
 	
 	unsigned int arg_stack_size = 10240, code_stack_size = 10240, 
 		steps_limit = 1048576, max_functions = 1024;
+	bool string_zero_to_int = false;
 	STLW::string source_charset, destination_charset;
 	
 	for (int i = 1; i < items; i += 2) {
@@ -33,12 +34,14 @@ CODE:
 			source_charset = SvPV_const(ST(i + 1), val_len);
 		} else if (strncasecmp("destination_charset", key, key_len) == 0) {
 			destination_charset = SvPV_const(ST(i + 1), val_len);
+		} else if (strncasecmp("string_zero_to_int", key, key_len) == 0) {
+			string_zero_to_int = SvIV(ST(i + 1)) != 0;
 		} else {
 			croak("CTPP2: Unknown parameter name: `%s`", key);
 		}
 	}
 	
-	RETVAL = new CTPP2(arg_stack_size, code_stack_size, steps_limit, max_functions, source_charset, destination_charset);
+	RETVAL = new CTPP2(arg_stack_size, code_stack_size, steps_limit, max_functions, source_charset, destination_charset, string_zero_to_int);
 OUTPUT:
 	RETVAL
 

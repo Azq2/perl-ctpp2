@@ -41,13 +41,14 @@ class CTPP2;
 class CTPPPerlSyscallHandler: public SyscallHandler {
 	public:
 		friend class STDLibInitializer;
-		CTPPPerlSyscallHandler(const char *func_name, CV *perl_sub);
+		CTPPPerlSyscallHandler(const char *func_name, CV *perl_sub, CTPP2 *ctpp_ref);
 		~CTPPPerlSyscallHandler() throw();
 		INT_32 Handler(CDT *args, const UINT_32 args_n, CDT &ret, Logger &logger);
 		CCHAR_P GetName() const;
 	protected:
 		CV *perl_sub;
 		char *name;
+		CTPP2 *ctpp;
 };
 
 // CTPPPerlLogger
@@ -131,6 +132,7 @@ class CTPP2 {
 		} charset;
 		STLW::vector<STLW::string> include_dirs;
 		STLW::map<STLW::string, SyscallHandler *> user_syscalls;
+		bool string_zero_to_int;
 		
 		friend class Bytecode;
 	public:
@@ -139,13 +141,13 @@ class CTPP2 {
 		static const FnHandler functions[];
 		
 		CTPP2(unsigned int arg_stack_size, unsigned int code_stack_size, unsigned int steps_limit, unsigned int max_functions, 
-			STLW::string src_charset, STLW::string dst_charset);
+			STLW::string src_charset, STLW::string dst_charset, bool string_zero_to_int);
 		int param(SV *var);
 		int json(const char *json, unsigned int length);
 		int loadUDF(const char *filename);
-		static void perl2cdt(SV *var, CDT *param);
-		static SV *cdt2perl(const CDT *cdt);
-		static void json2cdt(const char *json, unsigned int length, CDT *cdt);
+		void perl2cdt(SV *var, CDT *param);
+		SV *cdt2perl(const CDT *cdt);
+		void json2cdt(const char *json, unsigned int length, CDT *cdt);
 		static const char *svTypeName(SV *svt);
 		CTPP2 *reset();
 		Bytecode *parse(SV *text, const char *filename, Bytecode::SourceType type);

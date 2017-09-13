@@ -135,7 +135,7 @@ TEST: <ololo: 0, spaces, 321>
   1. Стянуть из SVN свежий CTPP2:
   
   ```
-  svn co http://ctpp.googlecode.com/svn/tags/ctpp2-2.8.4/
+  git clone git://github.com/Azq2/ctpp2.git
   ```
   2. Собрать и установить
   
@@ -147,9 +147,9 @@ TEST: <ololo: 0, spaces, 321>
   3. Стянуть этот модуль с этого репозитория
   
   ```
-  git clone https://github.com/Azq2/perl-ctpp2.git
+  git clone git://github.com/Azq2/perl-ctpp2.git
   ```
-  4. Собрать с ранее установленной CTPP 2.8.4
+  4. Собрать с ранее установленной CTPP 2.8.5
   
   ```
   perl Makefile.PL
@@ -171,26 +171,26 @@ TEST: <ololo: 0, spaces, 321>
   1. Стянуть из SVN свежий CTPP2:
   
   ```
-  svn co http://ctpp.googlecode.com/svn/tags/ctpp2-2.8.4/
+  git clone git://github.com/Azq2/ctpp2.git
   ```
   2. Собрать и установить в локальную директорию куда-нибудь (должна быть доступна серверу, если это веб приложение)
   
   ```
-  cmake .
+  cmake -DCMAKE_INSTALL_PREFIX=~/ctpp2 .
   make -j3
   ```
   
-  После этого установить куда-то в локальный путь:
+  После этого установить:
   
   ```
-  make DESTDIR=~/ctpp2 install
+  make install
   ```
   3. Стянуть этот модуль с этого репозитория
   
   ```
-  git clone https://github.com/Azq2/perl-ctpp2.git
+  git clone git://github.com/Azq2/perl-ctpp2.git
   ```
-  4. Собрать с ранее установленной CTPP 2.8.4
+  4. Собрать с ранее установленной CTPP 2.8.5
   
   ```
   CTPP2_INCLUDE=~/ctpp2/usr/local/include/ctpp2 CTPP2_LIB=~/ctpp2/usr/local/lib/ perl Makefile.PL

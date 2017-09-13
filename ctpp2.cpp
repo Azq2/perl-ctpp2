@@ -2,9 +2,10 @@
 using namespace CTPP;
 
 // CTPPPerlSyscallHandler
-CTPPPerlSyscallHandler::CTPPPerlSyscallHandler(const char *func_name, CV *sub) {
+CTPPPerlSyscallHandler::CTPPPerlSyscallHandler(const char *func_name, CV *sub, CTPP2 *ctpp_ref) {
 	name = strdup(func_name);
 	perl_sub = sub;
+	ctpp = ctpp_ref;
 }
 INT_32 CTPPPerlSyscallHandler::Handler(CDT *args, const UINT_32 args_n, CDT &ret, Logger &logger) {
 	ret = CDT(CTPP::CDT::UNDEF);
@@ -13,7 +14,7 @@ INT_32 CTPPPerlSyscallHandler::Handler(CDT *args, const UINT_32 args_n, CDT &ret
 	ENTER; SAVETMPS; PUSHMARK(SP);
 	
 	for (unsigned int i = args_n; i-- > 0; )
-		XPUSHs(sv_2mortal(CTPP2::cdt2perl(&args[i])));
+		XPUSHs(sv_2mortal(ctpp->cdt2perl(&args[i])));
 	
 	PUTBACK;
 	call_sv((SV *) perl_sub, G_SCALAR);
@@ -21,7 +22,7 @@ INT_32 CTPPPerlSyscallHandler::Handler(CDT *args, const UINT_32 args_n, CDT &ret
 	
 	SV *ret_sv_var = POPs;
 	try {
-		CTPP2::perl2cdt(ret_sv_var, &ret);
+		ctpp->perl2cdt(ret_sv_var, &ret);
 	} catch (...) {
 		PUTBACK;
 		FREETMPS; LEAVE;
@@ -84,7 +85,10 @@ CTPPPerlOutputCollector::~CTPPPerlOutputCollector() throw() { }
 
 // CTPP2
 CTPP2::CTPP2(unsigned int arg_stack_size, unsigned int code_stack_size, unsigned int steps_limit, unsigned int max_functions, 
-	STLW::string src_charset, STLW::string dst_charset) {
+	STLW::string src_charset, STLW::string dst_charset, bool arg_string_zero_to_int) {
+	
+	string_zero_to_int = arg_string_zero_to_int;
+	
 	try {
 		params = new CDT(CDT::HASH_VAL);
 		syscalls = new SyscallFactory(max_functions);
@@ -130,7 +134,7 @@ void CTPP2::bind(const char *name, CV *func) {
 	if (h) {
 		croak("CTPP2: Cannot redefine udf %s", name);
 	} else {
-		CTPPPerlSyscallHandler *handler = new CTPPPerlSyscallHandler(name, func);
+		CTPPPerlSyscallHandler *handler = new CTPPPerlSyscallHandler(name, func, this);
 		syscalls->RegisterHandler(handler);
 		user_syscalls[name] = handler;
 	}
@@ -420,7 +424,12 @@ void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
 	if (SvPOKp(sv)) { // Строка
 		STRLEN len;
 		const char *val = SvPV_const(sv, len);
-		cdt->operator=(STLW::string(val, len));
+		
+		if (string_zero_to_int && len == 1 && val[0] == '0') {
+			cdt->operator=(INT_64(0));
+		} else {
+			cdt->operator=(STLW::string(val, len));
+		}
 	} else if (SvNOKp(sv)) { // Float
 		cdt->operator=(W_FLOAT(SvNV(sv)));
 	} else if (SvIOKp(sv)) { // Int
@@ -464,7 +473,7 @@ void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
 		// Пройдёмся по всем элементам хэша, конвертируя всё в CDT на своём пути
 		while ((entry = hv_iternext(hash)) != NULL) {
 			SV *value = hv_iterval(hash, entry);
-			int key_len;
+			I32 key_len;
 			const char *key_name = hv_iterkey(entry, &key_len);
 			if (value) {
 				CTPP::CDT tmp;
@@ -474,13 +483,13 @@ void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
 		}
 	} else if (SvTYPE(sv) == SVt_PVAV) { // Массив
 		AV *array = (AV *) sv;
-		int len = av_len(array) + 1;
+		UINT_32 len = av_len(array) + 1;
 		
 		if (cdt->GetType() != CTPP::CDT::ARRAY_VAL)
 			cdt->operator=(CTPP::CDT(CTPP::CDT::ARRAY_VAL));
 		
 		// Пройдёмся по всем элементам массива, конвертируя всё в CDT на своём пути
-		for (int i = 0; i < len; ++i) {
+		for (UINT_32 i = 0; i < len; ++i) {
 			SV **el = av_fetch(array, i, FALSE);
 			CTPP::CDT tmp;
 			if (el && *el)
