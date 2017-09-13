@@ -388,7 +388,7 @@ SV *CTPP2::cdt2perl(const CDT *cdt) {
 			AV *av = newAV();
 			unsigned int array_size = cdt->Size();
 			for (unsigned i = 0; i < array_size; ++i)
-				av_push(av, cdt2perl(&(*cdt)[i]));
+				av_push(av, cdt2perl(&(cdt->operator[](i))));
 			ret = newRV_inc((SV *) av);
 		}
 		break;
@@ -491,10 +491,11 @@ void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
 		// Пройдёмся по всем элементам массива, конвертируя всё в CDT на своём пути
 		for (UINT_32 i = 0; i < len; ++i) {
 			SV **el = av_fetch(array, i, FALSE);
-			CTPP::CDT tmp;
-			if (el && *el)
+			if (el) {
+				CTPP::CDT tmp;
 				perl2cdt(*el, &tmp);
-			cdt->operator[](i) = tmp;
+				cdt->operator[](i) = tmp;
+			}
 		}
 	} else if (SvTYPE(sv) == SVt_PVCV) { // Функция
 		dSP;
