@@ -387,8 +387,10 @@ SV *CTPP2::cdt2perl(const CDT *cdt) {
 		{
 			AV *av = newAV();
 			unsigned int array_size = cdt->Size();
-			for (unsigned i = 0; i < array_size; ++i)
-				av_push(av, cdt2perl(&(cdt->operator[](i))));
+			for (unsigned i = 0; i < array_size; ++i) {
+				const CTPP::CDT &tmp = cdt->operator[](i);
+				av_push(av, cdt2perl(&tmp[i]));
+			}
 			ret = newRV_inc((SV *) av);
 		}
 		break;
