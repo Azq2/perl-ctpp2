@@ -511,6 +511,8 @@ void CTPP2::perl2cdt(SV *sv, CDT *cdt) {
 		FREETMPS; LEAVE;
 	} else if (SvTYPE(sv) == SVt_NULL) { // undef
 		// Ничего не делаем
+	} else if (SvSTASH(sv)) { // Stash
+		return perl2cdt((SV *) SvSTASH(sv), cdt);
 	} else {
 		warn("%s: Unknown type (svtype=%d)", __func__, SvTYPE(sv));
 	}
