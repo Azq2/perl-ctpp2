@@ -366,7 +366,7 @@ void CTPP2::json2cdt(const char *json, unsigned int length, CDT *cdt) {
 	jparser.Parse(json, json + length);
 }
 
-SV *CTPP2::cdt2perl(const CDT *cdt) {
+SV *CTPP2::cdt2perl(CDT *cdt) {
 	SV *ret = NULL;
 	switch (cdt->GetType()) {
 		case CDT::INT_VAL:
@@ -387,10 +387,8 @@ SV *CTPP2::cdt2perl(const CDT *cdt) {
 		{
 			AV *av = newAV();
 			unsigned int array_size = cdt->Size();
-			for (unsigned i = 0; i < array_size; ++i) {
-				const CTPP::CDT &tmp = cdt->operator[](i);
-				av_push(av, cdt2perl(&tmp[i]));
-			}
+			for (unsigned i = 0; i < array_size; ++i)
+				av_push(av, cdt2perl(&(cdt->operator[](i))));
 			ret = newRV_inc((SV *) av);
 		}
 		break;
@@ -399,7 +397,7 @@ SV *CTPP2::cdt2perl(const CDT *cdt) {
 		{
 			HV *hash = newHV();
 			for (CDT::ConstIterator it = cdt->Begin(), end = cdt->End(); it != end; ++it)
-				hv_store_ent(hash, newSVpv(it->first.c_str(), it->first.size()), cdt2perl(&it->second), 0);
+				hv_store_ent(hash, newSVpv(it->first.c_str(), it->first.size()), cdt2perl((CTPP::CDT *) &it->second), 0);
 			ret = newRV_inc((SV *) hash);
 		}
 		break;

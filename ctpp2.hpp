@@ -146,7 +146,7 @@ class CTPP2 {
 		int json(const char *json, unsigned int length);
 		int loadUDF(const char *filename);
 		void perl2cdt(SV *var, CDT *param);
-		SV *cdt2perl(const CDT *cdt);
+		SV *cdt2perl(CDT *cdt);
 		void json2cdt(const char *json, unsigned int length, CDT *cdt);
 		static const char *svTypeName(SV *svt);
 		CTPP2 *reset();
