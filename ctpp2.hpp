@@ -133,6 +133,7 @@ class CTPP2 {
 		STLW::vector<STLW::string> include_dirs;
 		STLW::map<STLW::string, SyscallHandler *> user_syscalls;
 		bool string_zero_to_int;
+		Bytecode *last_bytecode;
 		
 		friend class Bytecode;
 	public:

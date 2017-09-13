@@ -88,6 +88,7 @@ CTPP2::CTPP2(unsigned int arg_stack_size, unsigned int code_stack_size, unsigned
 	STLW::string src_charset, STLW::string dst_charset, bool arg_string_zero_to_int) {
 	
 	string_zero_to_int = arg_string_zero_to_int;
+	last_bytecode = NULL;
 	
 	try {
 		params = new CDT(CDT::HASH_VAL);
@@ -227,14 +228,22 @@ SV *CTPP2::output(Bytecode *bytecode, SV *src_enc, SV *dst_enc) {
 			STLW::string result;
 			CTPPPerlLogger logger;
 			StringIconvOutputCollector output_collector(result, src_charset, dst_charset, 3);
-			vm->Init(bytecode->getCode(), &output_collector, &logger);
+			
+			if (last_bytecode != bytecode)
+				vm->Init(bytecode->getCode(), &output_collector, &logger);
+			last_bytecode = bytecode;
+			
 			vm->Run(bytecode->getCode(), &output_collector, IP, *params, &logger);
 			return newSVpv(result.data(), result.length());
 		} else {
 			SV *out = newSVpv("", 0);
 			CTPPPerlLogger logger;
 			CTPPPerlOutputCollector output_collector(out);
-			vm->Init(bytecode->mem, &output_collector, &logger);
+			
+			if (last_bytecode != bytecode)
+				vm->Init(bytecode->mem, &output_collector, &logger);
+			last_bytecode = bytecode;
+			
 			vm->Run(bytecode->mem, &output_collector, IP, *params, &logger);
 			return out;
 		}
@@ -287,6 +296,7 @@ SV *CTPP2::output(Bytecode *bytecode, SV *src_enc, SV *dst_enc) {
 		error = CTPPError("", "Unknown Error", CTPP_VM_ERROR | STL_UNKNOWN_ERROR, 0, 0, IP);
 	}
 	vm->Reset();
+	last_bytecode = NULL;
 	
 	if (error.line > 0) {
 		warn("output(): %s (error code 0x%08X); IP: 0x%08X, file %s line %d pos %d", error.error_descr.c_str(),
